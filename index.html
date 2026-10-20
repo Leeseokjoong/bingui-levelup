@@ -47,6 +47,24 @@ canvas{display:block;width:100%;height:100%}
 #act[disabled]{background:#2a323f;color:#5c6676;box-shadow:none}
 #act.boss{background:var(--gold);box-shadow:0 0 34px rgba(255,209,102,.55)}
 
+/* 스킬창 */
+#skills{position:absolute;left:50%;transform:translateX(-50%);
+  bottom:calc(96px + env(safe-area-inset-bottom,0px));
+  display:flex;gap:10px;pointer-events:auto}
+.sk{position:relative;width:60px;height:60px;border-radius:50%;border:2px solid var(--line);
+  background:var(--panel);color:var(--ink);font-family:var(--display);font-size:12px;line-height:1.15;
+  padding:4px;cursor:pointer;overflow:hidden;display:grid;place-items:center;text-align:center}
+.sk span{position:relative;z-index:1;word-break:keep-all}
+.sk .cdv{position:absolute;left:0;right:0;bottom:0;height:0;background:rgba(0,0,0,.62);z-index:0}
+.sk .num{position:absolute;top:4px;left:50%;transform:translateX(-50%);font-size:9px;color:var(--dim);z-index:1}
+.sk.ready{border-color:var(--skc,var(--soul));box-shadow:0 0 14px color-mix(in srgb,var(--skc,#7fd8ff) 45%,transparent)}
+.sk:focus-visible,#autoBtn:focus-visible,#act:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+#autoBtn{position:absolute;right:max(16px,env(safe-area-inset-right,0px));
+  bottom:calc(34px + env(safe-area-inset-bottom,0px));pointer-events:auto;cursor:pointer;
+  border:1px solid var(--line);background:var(--panel);color:var(--dim);
+  font-family:var(--display);font-size:13px;border-radius:999px;padding:7px 12px}
+#autoBtn.on{color:#0d1016;background:var(--good);border-color:var(--good)}
+
 .sheet{position:absolute;inset:0;display:grid;place-items:center;pointer-events:auto;
   background:rgba(8,10,14,.82);
   padding-left:max(16px,env(safe-area-inset-left,0px));
@@ -92,6 +110,8 @@ canvas{display:block;width:100%;height:100%}
   </div>
 
   <button id="act" disabled>빙의</button>
+  <div id="skills"></div>
+  <button id="autoBtn" type="button">기술 자동 끔</button>
 
   <div class="sheet" id="startSheet">
     <div class="box">
@@ -157,6 +177,7 @@ var SFX={
   shatter:function(){ noise(.35,.2,700); blip({type:"sine",f0:700,f1:120,d:.3,v:.12}); },
   fail:function(){ blip({type:"sawtooth",f0:200,f1:80,d:.3,v:.14}); },
   spit:function(){ blip({type:"sine",f0:620,f1:230,d:.09,v:.09}); },
+  skill:function(){ blip({type:"triangle",f0:300,f1:760,d:.16,v:.15}); noise(.12,.08,900); },
   splat:function(){ noise(.07,.08,1200); blip({type:"sine",f0:180,f1:90,d:.08,v:.08}); }
 };
 function buzz(ms){ try{ if(navigator.vibrate) navigator.vibrate(ms); }catch(e){} }
@@ -175,6 +196,19 @@ var GROGGY=[0,4.0,3.6,3.2,2.8,2.4,2.0];
 var GAUGE_W=[0,.20,.17,.14,.115,.09,.07];
 var GAUGE_S=[0,.60,.70,.80,.95,1.10,1.30];
 
+// 몸마다 가진 기술 (버튼으로 쓴다). m=기본 공격력 배수
+var SKILLS=[
+ [{n:"점액 폭탄",cd:4,k:"bomb",m:2.4,R:85},{n:"분열",cd:7,k:"nova",cnt:10,m:1}],
+ [{n:"삼단 찌르기",cd:3,k:"triple",m:1.3},{n:"투창",cd:4,k:"pierce",m:2.2}],
+ [{n:"질주",cd:5,k:"dash",m:1.5,dist:230},{n:"물어뜯기",cd:3,k:"cone",m:2.4,R:80,h:.9,fx:"bite"},{n:"울부짖기",cd:8,k:"stun",R:190,dur:1.6}],
+ [{n:"내려찍기",cd:4,k:"slam",m:2.2,R:150,kb:90},{n:"휘두르기",cd:3,k:"slam",m:1.2,R:115,kb:220},{n:"돌진",cd:6,k:"dash",m:1.8,dist:210}],
+ [{n:"급강하",cd:4,k:"leap",m:2.2,R:110},{n:"날개바람",cd:3,k:"cone",m:1,R:190,h:1.1,kb:320,fx:"gust"},{n:"낚아채기",cd:5,k:"grab",m:5}],
+ [{n:"비행",cd:9,k:"fly",dur:2.6},{n:"화염 숨결",cd:3,k:"cone",m:2,R:220,h:.5,fx:"breath"},{n:"꼬리치기",cd:3,k:"slam",m:1.5,R:110,kb:160},{n:"급습",cd:5,k:"dash",m:2,dist:240}],
+ [{n:"광역 화염",cd:4,k:"ring",m:2.4,R:210},{n:"날개 돌풍",cd:4,k:"slam",m:1,R:230,kb:380},{n:"포효",cd:8,k:"stun",R:420,dur:2.2},{n:"비행",cd:9,k:"fly",dur:2.6}]
+];
+var AUTO=false;
+try{ AUTO=localStorage.getItem("bingui_auto")==="1"; }catch(e){}
+
 var S=null, cam={x:0,y:0,sx:0,sy:0}, drag={on:false,ox:0,oy:0,x:0,y:0};
 var stop=0; // 히트스톱
 var best=null;
@@ -184,7 +218,7 @@ function mk(){
   return { phase:"play", t:0, slow:1, lv:0,
     hp:TIER[0].hp, hpMax:TIER[0].hp, x:0,y:0, face:1,
     soul:0, orbs:3, cd:0, hurt:0, flash:0,
-    foes:[], hits:[], bits:[], trail:[], boss:null, fx:[], puddles:[], hop:null, shots:[], squish:0,
+    foes:[], hits:[], bits:[], trail:[], boss:null, fx:[], puddles:[], hop:null, shots:[], squish:0, skcd:[0,0,0,0], queue:[], fly:0,
     spawnT:0, bossT:14, wave:1, gauge:null, card:null, result:null, missed:0 };
 }
 function tier(){ return TIER[S.lv]; }
@@ -206,6 +240,7 @@ var KEYS={};
 window.addEventListener("keydown",function(e){
   var k=e.key.toLowerCase(); KEYS[k]=true; if(S&&S.phase==="play") S.moved=true;
   if(k===" "||k==="enter"){ if(S&&S.phase==="gauge") resolveGauge(); else if(S&&S.phase==="card") closeCard(); else if(S&&S.phase==="play") doAction(); }
+  if(k>="1"&&k<="4"&&k.length===1) castSkill(parseInt(k,10)-1);
   if(k.indexOf("arrow")===0||k===" ") e.preventDefault();
 });
 window.addEventListener("keyup",function(e){ KEYS[e.key.toLowerCase()]=false; });
@@ -288,7 +323,7 @@ function jumpTo(f){
   burst(S.x,S.y,"#7fd8ff",10,180);
   S.lv=(f.lv>=S.lv)?S.lv:f.lv;
   S.hpMax=tier().hp; S.hp=S.hpMax;
-  S.x=f.x; S.y=f.y; S.soul=0; S.flash=.35;
+  S.x=f.x; S.y=f.y; S.soul=0; S.flash=.35; S.skcd=[0,0,0,0]; renderSkills();
   var i=S.foes.indexOf(f); if(i>=0) S.foes.splice(i,1);
   SFX.possess(); buzz(25); shake(7);
   showCard(0.5,false);
@@ -304,7 +339,7 @@ function resolveGauge(){
     S.lv=l; S.hpMax=tier().hp; S.hp=S.hpMax;
     S.x=S.boss.x; S.y=S.boss.y;
     S.orbs=Math.min(5,S.orbs+(perfect?2:1));
-    S.soul=0; S.flash=.65; S.boss=null; S.wave++; S.bossT=20;
+    S.soul=0; S.flash=.65; S.boss=null; S.wave++; S.bossT=20; S.skcd=[0,0,0,0]; renderSkills();
     shake(16); buzz(perfect?[40,40,70]:50);
     if(perfect) SFX.perfect(); else SFX.possess();
     if(S.lv===TIER.length-1){ endGame(true); return; }
@@ -325,7 +360,7 @@ function showCard(dur,perfect){
     '<div class="stat"><em>속도</em><span class="dots">'+dots(t.st[0])+'</span></div>'+
     '<div class="stat"><em>체력</em><span class="dots">'+dots(t.st[1])+'</span></div>'+
     '<div class="stat"><em>공격</em><span class="dots">'+dots(t.st[2])+'</span></div>'+
-    '<div class="skill">'+t.sk+'</div>'+
+    '<div class="skill">'+SKILLS[S.lv].map(function(s){return s.n;}).join(" · ")+'</div>'+
     (perfect?'<div class="perfect">완벽한 빙의 · 구슬 +2</div>':'')+'</div>';
   document.getElementById("cardSheet").hidden=false;
 }
@@ -369,7 +404,15 @@ function step(d,dtReal){
   if(d<=0) return;
   S.t+=d; S.flash=Math.max(0,S.flash-d*2); S.hurt=Math.max(0,S.hurt-d);
 
-  var t=tier(), spd=S.soul>0?235:t.spd;
+  // 기술 쿨타임, 예약된 동작, 비행
+  for(var ci=0;ci<4;ci++) S.skcd[ci]=Math.max(0,S.skcd[ci]-d);
+  for(var qi=S.queue.length-1;qi>=0;qi--){ S.queue[qi].t-=d; if(S.queue[qi].t<=0){ var qf=S.queue[qi].fn; S.queue.splice(qi,1); qf(); } }
+  S.fly=Math.max(0,S.fly-d);
+  if(AUTO&&S.soul<=0&&!S.hop&&nearestAny(200)){
+    var sl=SKILLS[S.lv];
+    for(var ai=0;ai<sl.length;ai++){ if(S.skcd[ai]<=0){ castSkill(ai); break; } }
+  }
+  var t=tier(), spd=(S.soul>0?235:t.spd)*(S.fly>0?1.5:1);
   var kd=keyDir(), useKeys=(kd.x||kd.y)&&!drag.on;
   if((drag.on||useKeys)&&!S.hop){
     var dx=useKeys?kd.x*70:drag.x-drag.ox, dy=useKeys?kd.y*70:drag.y-drag.oy, len=Math.hypot(dx,dy);
@@ -402,6 +445,7 @@ function step(d,dtReal){
       if(e.groggy<=0){ e.hp=e.hpMax*0.40; e.rage*=1.22; S.missed++; SFX.fail(); }
       continue;
     }
+    if(e.stun>0){ e.stun-=d; continue; }
     var ax=S.x-e.x, ay=S.y-e.y, L=Math.hypot(ax,ay)||1;
     if(Math.abs(ax)>2) e.face=ax>0?1:-1;
     var sp=e.spd*(e.rage||1)*puddleSlow(e);
@@ -414,7 +458,7 @@ function step(d,dtReal){
       }
     }
     e.touch-=d;
-    if(S.soul<=0 && L<e.r+tier().r && e.touch<=0){
+    if(S.soul<=0 && !(S.fly>0) && L<e.r+tier().r && e.touch<=0){
       e.touch=.7; S.hp-=e.dmg; S.hurt=.25; SFX.hurt(); shake(5); buzz(15);
       if(S.hp<=0){
         if(S.orbs<=0){ endGame(false); return; }
@@ -431,14 +475,26 @@ function step(d,dtReal){
   // 점액 덩어리
   for(var si=S.shots.length-1;si>=0;si--){
     var sh=S.shots[si]; sh.x+=sh.vx*d; sh.y+=sh.vy*d; sh.life-=d; sh.ph+=d*22;
-    if(Math.random()<d*35) S.bits.push({x:sh.x,y:sh.y,vx:0,vy:0,t:.16,c:"#5ec8ff",r:2.2});
+    if(!sh.spear&&Math.random()<d*35) S.bits.push({x:sh.x,y:sh.y,vx:0,vy:0,t:.16,c:"#5ec8ff",r:2.2});
     var hitT=null, ts=targets();
-    for(var ti=0;ti<ts.length;ti++){ var tf=ts[ti]; if(Math.hypot(tf.x-sh.x,tf.y-sh.y)<tf.r+sh.r){ hitT=tf; break; } }
+    for(var ti=0;ti<ts.length;ti++){
+      var tf=ts[ti]; if(sh.pierce&&sh.hits.indexOf(tf)>=0) continue;
+      if(Math.hypot(tf.x-sh.x,tf.y-sh.y)<tf.r+sh.r){ hitT=tf; break; }
+    }
+    if(hitT&&sh.pierce){ damage(hitT,sh.dmg); sh.hits.push(hitT); SFX.hit(); burst(sh.x,sh.y,"#e8d9a8",5,120); hitT=null; }
     if(hitT||sh.life<=0){
-      if(hitT){ damage(hitT,sh.dmg); hitCircle(sh.x,sh.y,22,sh.dmg*0.3); SFX.splat(); stop=.025; }
-      burst(sh.x,sh.y,"#5ec8ff",8,140);
-      S.puddles.push({x:sh.x,y:sh.y,r:30,t:2.6});
-      S.fx.push({k:"splat",x:sh.x,y:sh.y,R:26,t:.2,d:.2});
+      if(sh.pierce){ S.shots.splice(si,1); continue; }
+      if(sh.boom){
+        hitCircle(sh.x,sh.y,sh.boom,sh.dmg); SFX.splat(); stop=.05; shake(7);
+        burst(sh.x,sh.y,"#5ec8ff",20,240);
+        S.puddles.push({x:sh.x,y:sh.y,r:sh.boom*0.8,t:3.5});
+        S.fx.push({k:"splat",x:sh.x,y:sh.y,R:sh.boom,t:.3,d:.3});
+      } else {
+        if(hitT){ damage(hitT,sh.dmg); hitCircle(sh.x,sh.y,22,sh.dmg*0.3); SFX.splat(); stop=.025; }
+        burst(sh.x,sh.y,"#5ec8ff",8,140);
+        S.puddles.push({x:sh.x,y:sh.y,r:30,t:2.6});
+        S.fx.push({k:"splat",x:sh.x,y:sh.y,R:26,t:.2,d:.2});
+      }
       S.shots.splice(si,1);
     }
   }
@@ -524,16 +580,124 @@ function attack(t){
 function updateHop(d){
   var h=S.hop; h.t+=d; var k=Math.min(1,h.t/h.dur), e=k*(2-k);
   S.x=h.fx+(h.tx-h.fx)*e; S.y=h.fy+(h.ty-h.fy)*e;
+  if(h.trail&&Math.random()<0.7) S.bits.push({x:S.x,y:S.y,vx:0,vy:0,t:.25,c:tier().c,r:4});
   if(k>=1){
-    var R=h.lunge?54:46;
-    if(h.lunge) hitCone(S.x,S.y,h.ang,R+10,1.0,h.dmg); else hitCircle(S.x,S.y,R,h.dmg);
-    S.fx.push({k:h.lunge?"bite":"land",x:S.x,y:S.y,a:h.ang,R:R,t:.22,d:.22});
-    if(!h.lunge) S.puddles.push({x:S.x,y:S.y,r:38,t:3.2});
-    SFX.hit(); stop=.04; shake(3);
+    if(h.slamR){
+      hitCircle(S.x,S.y,h.slamR,h.dmg);
+      S.fx.push({k:"slam",x:S.x,y:S.y,R:h.slamR,t:.32,d:.32}); shake(9); SFX.hit(); stop=.05;
+    } else if(h.lunge&&!h.quiet){
+      hitCone(S.x,S.y,h.ang,64,1.0,h.dmg);
+      S.fx.push({k:"bite",x:S.x,y:S.y,a:h.ang,R:54,t:.22,d:.22}); SFX.hit(); stop=.04; shake(3);
+    }
     S.hop=null;
   }
 }
-function hopLift(){ if(!S.hop||S.hop.lunge) return 0; var k=Math.min(1,S.hop.t/S.hop.dur); return Math.sin(k*Math.PI)*16; }
+function hopLift(){
+  if(S.fly>0) return 24;
+  if(!S.hop||S.hop.lunge) return 0;
+  var k=Math.min(1,S.hop.t/S.hop.dur); return Math.sin(k*Math.PI)*(S.hop.lift||16);
+}
+
+/* ── 기술 (버튼) ────────────────────────────────────── */
+function moveDir(){
+  if(drag.on){ var dx=drag.x-drag.ox,dy=drag.y-drag.oy; if(Math.hypot(dx,dy)>6) return Math.atan2(dy,dx); }
+  var kd=keyDir(); if(kd.x||kd.y) return Math.atan2(kd.y,kd.x);
+  return null;
+}
+function knock(x,y,R,kb){
+  targets().forEach(function(f){
+    var dx=f.x-x,dy=f.y-y,L=Math.hypot(dx,dy);
+    if(L<R+f.r&&L>0){ f.kx+=dx/L*kb*(f.boss?0.3:1); f.ky+=dy/L*kb*(f.boss?0.3:1); }
+  });
+}
+function thrustAt(ang,dmg){
+  var L=115; hitLine(S.x,S.y,ang,L,14,dmg);
+  S.fx.push({k:"thrust",x:S.x,y:S.y,a:ang,L:L,t:.16,d:.16}); SFX.hit();
+}
+function castSkill(i){
+  if(!S||S.phase!=="play"||S.soul>0||S.hop) return;
+  var s=SKILLS[S.lv][i]; if(!s||S.skcd[i]>0) return;
+  var t=tier(), dmg=t.dmg*(s.m||1), tg=nearestAny(420), ok=true;
+  var ang=tg?Math.atan2(tg.y-S.y,tg.x-S.x):(S.face>0?0:Math.PI);
+  if(tg&&Math.abs(tg.x-S.x)>1) S.face=tg.x>S.x?1:-1;
+  var k=s.k;
+  if(k==="bomb"){
+    S.shots.push({x:S.x,y:S.y,vx:Math.cos(ang)*360,vy:Math.sin(ang)*360,r:13,dmg:dmg,life:.75,ph:0,boom:s.R});
+  } else if(k==="nova"){
+    for(var j=0;j<s.cnt;j++){ var a=j/s.cnt*6.283;
+      S.shots.push({x:S.x,y:S.y,vx:Math.cos(a)*420,vy:Math.sin(a)*420,r:7,dmg:dmg,life:.7,ph:j}); }
+  } else if(k==="triple"){
+    thrustAt(ang,dmg);
+    S.queue.push({t:.12,fn:function(){ thrustAt(ang+0.18,dmg); }});
+    S.queue.push({t:.24,fn:function(){ thrustAt(ang-0.18,dmg); }});
+  } else if(k==="pierce"){
+    S.shots.push({x:S.x,y:S.y,vx:Math.cos(ang)*640,vy:Math.sin(ang)*640,r:9,dmg:dmg,life:.85,ph:0,pierce:true,spear:true,hits:[]});
+  } else if(k==="dash"){
+    var md=moveDir(), a2=(md!==null)?md:ang;
+    hitLine(S.x,S.y,a2,s.dist,26,dmg);
+    S.hop={t:0,dur:.16,fx:S.x,fy:S.y,tx:S.x+Math.cos(a2)*s.dist,ty:S.y+Math.sin(a2)*s.dist,dmg:0,ang:a2,lunge:true,quiet:true,trail:true};
+    shake(4);
+  } else if(k==="cone"){
+    hitCone(S.x,S.y,ang,s.R,s.h,dmg,s.kb||0);
+    S.fx.push({k:s.fx,x:S.x,y:S.y,a:ang,R:s.R,h:s.h,t:.3,d:.3});
+    if(s.fx==="breath"){ for(var b=0;b<12;b++){ var ab=ang+(Math.random()-0.5)*s.h*2, v=s.R*(1.2+Math.random()*1.4);
+      S.bits.push({x:S.x,y:S.y,vx:Math.cos(ab)*v,vy:Math.sin(ab)*v,t:.4,c:Math.random()<.5?"#ffb347":"#ff5a3c",r:2+Math.random()*3}); } }
+  } else if(k==="stun"){
+    targets().forEach(function(f){ if(Math.hypot(f.x-S.x,f.y-S.y)<s.R+f.r&&!(f.boss&&f.groggy>0)) f.stun=f.boss?s.dur*0.5:s.dur; });
+    S.fx.push({k:"roar",x:S.x,y:S.y,R:s.R,t:.45,d:.45}); shake(8);
+  } else if(k==="slam"){
+    hitCircle(S.x,S.y,s.R,dmg); knock(S.x,S.y,s.R,s.kb||0);
+    S.fx.push({k:"slam",x:S.x,y:S.y,R:s.R,t:.32,d:.32}); shake(8);
+  } else if(k==="leap"){
+    var px=tg?tg.x:S.x+Math.cos(ang)*150, py=tg?tg.y:S.y+Math.sin(ang)*150;
+    var aa=Math.atan2(py-S.y,px-S.x), lim=Math.min(Math.hypot(px-S.x,py-S.y),260);
+    S.hop={t:0,dur:.32,fx:S.x,fy:S.y,tx:S.x+Math.cos(aa)*lim,ty:S.y+Math.sin(aa)*lim,dmg:dmg,ang:aa,slamR:s.R,lift:42};
+  } else if(k==="grab"){
+    var gt=nearestAny(170);
+    if(!gt) ok=false;
+    else { damage(gt,dmg); S.fx.push({k:"bite",x:gt.x,y:gt.y,a:ang,R:50,t:.25,d:.25});
+      burst(gt.x,gt.y,"#e8c45e",12,200); shake(6); stop=.06; }
+  } else if(k==="ring"){
+    hitCircle(S.x,S.y,s.R,dmg);
+    S.fx.push({k:"firering",x:S.x,y:S.y,R:s.R,t:.45,d:.45}); shake(10);
+    for(var r2=0;r2<24;r2++){ var ar=r2/24*6.283;
+      S.bits.push({x:S.x,y:S.y,vx:Math.cos(ar)*s.R*2,vy:Math.sin(ar)*s.R*2,t:.4,c:r2%2?"#ffb347":"#ff5a3c",r:3}); }
+  } else if(k==="fly"){
+    S.fly=s.dur;
+  }
+  if(ok){ S.skcd[i]=s.cd; SFX.skill(); buzz(12); }
+}
+var elSk=document.getElementById("skills"), elAuto=document.getElementById("autoBtn");
+function renderSkills(){
+  elSk.innerHTML="";
+  var list=SKILLS[S.lv], col=tier().c;
+  list.forEach(function(s,i){
+    var b=document.createElement("button"); b.type="button"; b.className="sk"; b.id="sk"+i;
+    b.style.setProperty("--skc",col);
+    b.innerHTML='<i class="cdv"></i><em class="num" style="font-style:normal">'+(i+1)+'</em><span>'+s.n+'</span>';
+    b.addEventListener("pointerdown",function(e){ e.stopPropagation(); });
+    b.addEventListener("click",function(e){ e.stopPropagation(); ac(); castSkill(i); });
+    elSk.appendChild(b);
+  });
+}
+function updateSkills(){
+  var show=S.phase==="play"&&S.soul<=0;
+  elSk.style.visibility=show?"visible":"hidden";
+  var list=SKILLS[S.lv];
+  for(var i=0;i<elSk.children.length;i++){
+    var b=elSk.children[i], s=list[i]; if(!s) continue;
+    var r=S.skcd[i]/s.cd;
+    b.firstChild.style.height=(r*100)+"%";
+    b.classList.toggle("ready",r<=0);
+  }
+  elAuto.textContent=AUTO?"기술 자동 켬":"기술 자동 끔";
+  elAuto.classList.toggle("on",AUTO);
+  elAuto.style.visibility=(S.phase==="play"||S.phase==="end")?"visible":"hidden";
+}
+elAuto.addEventListener("pointerdown",function(e){ e.stopPropagation(); });
+elAuto.addEventListener("click",function(e){
+  e.stopPropagation(); AUTO=!AUTO; try{ localStorage.setItem("bingui_auto",AUTO?"1":"0"); }catch(err){}
+});
 function puddleSlow(e){
   for(var i=0;i<S.puddles.length;i++){ var p=S.puddles[i];
     if(Math.hypot(e.x-p.x,e.y-p.y)<p.r+e.r*0.5) return e.boss?0.75:0.45; }
@@ -567,6 +731,16 @@ function drawFx(ox,oy){
         g.strokeStyle="rgba(255,255,255,"+(0.6*a)+")"; g.lineWidth=2;
         for(var s=1;s<=3;s++){ g.beginPath(); g.arc(0,0,R2*s/3.3,-h2*0.8,h2*0.8); g.stroke(); }
       }
+    } else if(f.k==="roar"){
+      var rr2=f.R*(1-a*0.85);
+      g.globalAlpha=a; g.strokeStyle="#ffd166"; g.lineWidth=5*a+1;
+      g.beginPath(); g.arc(x,y,rr2,0,6.3); g.stroke();
+    } else if(f.k==="firering"){
+      var rf=f.R*(0.3+0.7*(1-a));
+      g.globalAlpha=a;
+      var gr=g.createRadialGradient(x,y,rf*0.45,x,y,rf);
+      gr.addColorStop(0,"rgba(255,140,50,0)"); gr.addColorStop(.7,"rgba(255,140,50,.6)"); gr.addColorStop(1,"rgba(255,60,30,0)");
+      g.fillStyle=gr; g.beginPath(); g.arc(x,y,rf,0,6.3); g.fill();
     } else if(f.k==="splat"){
       var rs=f.R*(0.4+0.6*(1-a));
       g.globalAlpha=a; g.strokeStyle="#7fd8ff"; g.lineWidth=3*a+1;
@@ -728,6 +902,8 @@ function draw(){
     var f=S.foes[j];
     g.fillStyle="rgba(0,0,0,.35)"; g.beginPath(); g.ellipse(f.x+ox,f.y+oy+f.r*0.75,f.r*0.8,f.r*0.3,0,0,6.3); g.fill();
     creature(f.lv,f.x+ox,f.y+oy,f.r,f.face,f.ph,f.hit>0,true);
+    if(f.stun>0){ g.strokeStyle="#ffd166"; g.lineWidth=2;
+      g.beginPath(); g.arc(f.x+ox,f.y+oy-f.r*1.9,6+Math.sin(S.t*12)*2,0,6.3); g.stroke(); }
   }
 
   if(S.boss){
@@ -750,6 +926,12 @@ function draw(){
 
   for(var s2=0;s2<S.shots.length;s2++){
     var shd=S.shots[s2], ssx=shd.x+ox, ssy=shd.y+oy, wob=1+Math.sin(shd.ph)*0.14;
+    if(shd.spear){
+      g.save(); g.translate(ssx,ssy); g.rotate(Math.atan2(shd.vy,shd.vx));
+      g.fillStyle="#8a6a3d"; g.fillRect(-26,-2,30,4);
+      g.fillStyle="#e8e2d0"; g.beginPath(); g.moveTo(4,-5); g.lineTo(16,0); g.lineTo(4,5); g.closePath(); g.fill();
+      g.restore(); continue;
+    }
     g.fillStyle="#5ec8ff"; g.beginPath();
     g.ellipse(ssx,ssy,shd.r*1.25*wob,shd.r/wob,Math.atan2(shd.vy,shd.vx),0,6.3); g.fill();
     g.strokeStyle="#1f6fa3"; g.lineWidth=2; g.stroke();
@@ -850,6 +1032,7 @@ function ui(){
   btn.textContent=a.label; btn.disabled=!a.enabled;
   btn.className=a.kind==="boss"?"boss":"";
   btn.style.visibility=(S.phase==="play")?"visible":"hidden";
+  updateSkills();
 }
 
 function start(){
@@ -862,6 +1045,7 @@ function start(){
   document.getElementById("startSheet").hidden=true;
   document.getElementById("endSheet").hidden=true;
   document.getElementById("cardSheet").hidden=true;
+  renderSkills();
 }
 document.getElementById("startBtn").onclick=start;
 resize(); S=mk(); S.phase="end";
