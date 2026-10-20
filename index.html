@@ -184,13 +184,13 @@ function buzz(ms){ try{ if(navigator.vibrate) navigator.vibrate(ms); }catch(e){}
 
 /* ── 등급표 ─────────────────────────────────────────── */
 var TIER=[
- {n:"슬라임", c:"#5ec8ff", hp:60,  spd:118, dmg:8,  rng:58,  cd:.5, r:16, line:"작아서 잘 맞지 않는다",          sk:"끈끈이",       st:[2,1,2]},
- {n:"고블린", c:"#5fd07a", hp:85,  spd:150, dmg:13, rng:72,  cd:.70, r:17, line:"창술에 능하다",                 sk:"삼단 찌르기", st:[3,2,3]},
- {n:"늑대",   c:"#c3cad6", hp:105, spd:190, dmg:17, rng:78,  cd:.58, r:18, line:"무리를 앞지른다",               sk:"질주",         st:[5,2,3]},
- {n:"오우거", c:"#c08550", hp:180, spd:128, dmg:34, rng:92,  cd:.92, r:24, line:"한 번 휘두르면 길이 열린다",    sk:"내려찍기",     st:[2,5,5]},
- {n:"그리핀", c:"#e8c45e", hp:150, spd:205, dmg:28, rng:102, cd:.58, r:22, line:"땅을 밟지 않고 덮친다",         sk:"급강하",       st:[5,3,4]},
- {n:"와이번", c:"#a56ad6", hp:170, spd:220, dmg:34, rng:116, cd:.52, r:24, line:"하늘에서는 아무도 닿지 못한다", sk:"화염 숨결",   st:[5,4,5]},
- {n:"드래곤", c:"#e8574a", hp:240, spd:200, dmg:52, rng:142, cd:.46, r:30, line:"쫓기던 것이 끝난다",            sk:"광역 화염",   st:[4,5,5]}
+ {n:"슬라임", c:"#5ec8ff", hp:60,  spd:118, dmg:8,  edmg:8,  rng:58,  cd:.5, r:16, line:"작아서 잘 맞지 않는다",          sk:"끈끈이",       st:[2,1,1]},
+ {n:"고블린", c:"#5fd07a", hp:85,  spd:150, dmg:16, edmg:13, rng:72,  cd:.50, r:17, line:"창술에 능하다",                 sk:"삼단 찌르기", st:[3,2,2]},
+ {n:"늑대",   c:"#c3cad6", hp:105, spd:190, dmg:28, edmg:17, rng:78,  cd:.50, r:18, line:"무리를 앞지른다",               sk:"질주",         st:[5,2,3]},
+ {n:"오우거", c:"#c08550", hp:180, spd:128, dmg:70, edmg:34, rng:92,  cd:.82, r:24, line:"한 번 휘두르면 길이 열린다",    sk:"내려찍기",     st:[2,5,4]},
+ {n:"그리핀", c:"#e8c45e", hp:150, spd:205, dmg:75, edmg:28, rng:102, cd:.58, r:22, line:"땅을 밟지 않고 덮친다",         sk:"급강하",       st:[5,3,4]},
+ {n:"와이번", c:"#a56ad6", hp:170, spd:220, dmg:100,edmg:34, rng:116, cd:.52, r:24, line:"하늘에서는 아무도 닿지 못한다", sk:"화염 숨결",   st:[5,4,5]},
+ {n:"드래곤", c:"#e8574a", hp:240, spd:200, dmg:130,edmg:52, rng:142, cd:.46, r:30, line:"쫓기던 것이 끝난다",            sk:"광역 화염",   st:[4,5,5]}
 ];
 var GROGGY=[0,4.0,3.6,3.2,2.8,2.4,2.0];
 var GAUGE_W=[0,.20,.17,.14,.115,.09,.07];
@@ -199,7 +199,7 @@ var GAUGE_S=[0,.60,.70,.80,.95,1.10,1.30];
 // 몸마다 가진 기술 (버튼으로 쓴다). m=기본 공격력 배수
 var SKILLS=[
  [{n:"점액 폭탄",cd:4,k:"bomb",m:2.4,R:85},{n:"분열",cd:7,k:"nova",cnt:10,m:1}],
- [{n:"삼단 찌르기",cd:3,k:"triple",m:1.3},{n:"투창",cd:4,k:"pierce",m:2.2}],
+ [{n:"삼단 찌르기",cd:3,k:"triple",m:2.2},{n:"창 비",cd:4,k:"pierce",m:2.2,cnt:5,spread:.55}],
  [{n:"질주",cd:5,k:"dash",m:1.5,dist:230},{n:"물어뜯기",cd:3,k:"cone",m:2.4,R:80,h:.9,fx:"bite"},{n:"울부짖기",cd:8,k:"stun",R:190,dur:1.6}],
  [{n:"내려찍기",cd:4,k:"slam",m:2.2,R:150,kb:90},{n:"휘두르기",cd:3,k:"slam",m:1.2,R:115,kb:220},{n:"돌진",cd:6,k:"dash",m:1.8,dist:210}],
  [{n:"급강하",cd:4,k:"leap",m:2.2,R:110},{n:"날개바람",cd:3,k:"cone",m:1,R:190,h:1.1,kb:320,fx:"gust"},{n:"낚아채기",cd:5,k:"grab",m:5}],
@@ -258,15 +258,16 @@ function spawnFoe(forceLv){
   var l=(forceLv!==undefined)?forceLv:lvMin+Math.floor(Math.random()*(lvMax-lvMin+1));
   var a=Math.random()*Math.PI*2, d=Math.hypot(W,H)*0.5+30, t=TIER[l];
   S.foes.push({x:S.x+Math.cos(a)*d,y:S.y+Math.sin(a)*d,lv:l,
-    hp:t.hp*0.55,hpMax:t.hp*0.55,r:t.r*0.78,spd:t.spd*0.72+S.wave*3,
-    dmg:t.dmg*Math.min(0.6,0.32+S.wave*0.06),touch:0,boss:false,hit:0,face:1,ph:Math.random()*6,kx:0,ky:0});
+    hp:t.hp*0.55*(1+l*0.35),hpMax:t.hp*0.55*(1+l*0.35),r:t.r*0.78,spd:t.spd*0.72+S.wave*3,
+    dmg:t.edmg*Math.min(0.6,0.32+S.wave*0.06),touch:0,boss:false,hit:0,face:1,ph:Math.random()*6,kx:0,ky:0});
 }
 function spawnBoss(){
   var l=Math.min(TIER.length-1,S.lv+1); if(l===S.lv) return;
   var t=TIER[l], a=Math.random()*Math.PI*2, d=Math.max(W,H)*0.6;
   S.boss={x:S.x+Math.cos(a)*d,y:S.y+Math.sin(a)*d,lv:l,
-    hp:t.hp*3.4+S.wave*40,hpMax:t.hp*3.4+S.wave*40,r:t.r*1.9,
-    spd:t.spd*0.46,dmg:t.dmg*1.5,touch:0,boss:true,groggy:0,rage:1,hit:0,face:1,ph:0,kx:0,ky:0};
+    // 보스 체력은 지금 내 몸의 공격력에 맞춘다 (약 14초 + 기술)
+    hp:(TIER[S.lv].dmg/TIER[S.lv].cd)*14+S.wave*25,hpMax:(TIER[S.lv].dmg/TIER[S.lv].cd)*14+S.wave*25,r:t.r*1.9,
+    spd:t.spd*0.46,dmg:t.edmg*1.5,touch:0,boss:true,groggy:0,rage:1,hit:0,face:1,ph:0,kx:0,ky:0};
 }
 function burst(x,y,col,n,sp){
   for(var i=0;i<n;i++){
@@ -513,9 +514,9 @@ function step(d,dtReal){
 }
 
 /* ── 몬스터마다 다른 공격 ───────────────────────────── */
-// 슬라임 점액 뱉기, 고블린 창 찌르기, 늑대 달려들어 물기, 오우거 내려찍기,
+// 슬라임 점액 뱉기, 고블린 창 던지기(꿰뚫음), 늑대 달려들어 물기, 오우거 내려찍기,
 // 그리핀 날개바람, 와이번 짧은 불길, 드래곤 넓은 불길
-var ATK=["spit","thrust","lunge","slam","gust","breath","breath"];
+var ATK=["spit","spear","lunge","slam","gust","breath","breath"];
 function targets(){ var a=S.foes.slice(); if(S.boss) a.push(S.boss); return a; }
 function nearestAny(maxD){
   var bf=null,bd=maxD;
@@ -543,13 +544,17 @@ function hitCone(x,y,ang,R,half,dmg,kb){
 }
 function attack(t){
   var k=ATK[S.lv];
-  var tg=nearestAny(k==="spit"?300:t.rng*1.25); if(!tg) return false;
+  var tg=nearestAny(k==="spit"?300:(k==="spear"?340:t.rng*1.25)); if(!tg) return false;
   var dx=tg.x-S.x, dy=tg.y-S.y, dist=Math.hypot(dx,dy), ang=Math.atan2(dy,dx);
   if(Math.abs(dx)>1) S.face=dx>0?1:-1;
   if(k==="spit"){
     var sp=430, mxp=S.x+Math.cos(ang)*t.r*0.9, myp=S.y+Math.sin(ang)*t.r*0.9;
     S.shots.push({x:mxp,y:myp,vx:Math.cos(ang)*sp,vy:Math.sin(ang)*sp,r:7,dmg:t.dmg,life:.85,ph:0});
     S.squish=.14; SFX.spit(); return true;
+  }
+  if(k==="spear"){
+    S.shots.push({x:S.x,y:S.y,vx:Math.cos(ang)*640,vy:Math.sin(ang)*640,r:9,dmg:t.dmg,life:.55,ph:0,pierce:true,spear:true,hits:[]});
+    SFX.spit(); return true;
   }
   if(k==="bounce"||k==="lunge"){
     var go=Math.max(0,Math.min(k==="lunge"?95:t.rng,dist-tg.r-t.r*0.5));
@@ -611,7 +616,7 @@ function knock(x,y,R,kb){
   });
 }
 function thrustAt(ang,dmg){
-  var L=115; hitLine(S.x,S.y,ang,L,14,dmg);
+  var L=160; hitLine(S.x,S.y,ang,L,22,dmg);
   S.fx.push({k:"thrust",x:S.x,y:S.y,a:ang,L:L,t:.16,d:.16}); SFX.hit();
 }
 function castSkill(i){
@@ -628,10 +633,14 @@ function castSkill(i){
       S.shots.push({x:S.x,y:S.y,vx:Math.cos(a)*420,vy:Math.sin(a)*420,r:7,dmg:dmg,life:.7,ph:j}); }
   } else if(k==="triple"){
     thrustAt(ang,dmg);
-    S.queue.push({t:.12,fn:function(){ thrustAt(ang+0.18,dmg); }});
-    S.queue.push({t:.24,fn:function(){ thrustAt(ang-0.18,dmg); }});
+    S.queue.push({t:.10,fn:function(){ thrustAt(ang+0.32,dmg); }});
+    S.queue.push({t:.20,fn:function(){ thrustAt(ang-0.32,dmg); }});
   } else if(k==="pierce"){
-    S.shots.push({x:S.x,y:S.y,vx:Math.cos(ang)*640,vy:Math.sin(ang)*640,r:9,dmg:dmg,life:.85,ph:0,pierce:true,spear:true,hits:[]});
+    var cnt=s.cnt||1, spr=s.spread||0;
+    for(var pj=0;pj<cnt;pj++){
+      var pa=ang+(cnt>1?(pj/(cnt-1)-0.5)*spr*2:0);
+      S.shots.push({x:S.x,y:S.y,vx:Math.cos(pa)*660,vy:Math.sin(pa)*660,r:10,dmg:dmg,life:.8,ph:0,pierce:true,spear:true,hits:[]});
+    }
   } else if(k==="dash"){
     var md=moveDir(), a2=(md!==null)?md:ang;
     hitLine(S.x,S.y,a2,s.dist,26,dmg);
