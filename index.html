@@ -99,7 +99,7 @@ canvas{display:block;width:100%;height:100%}
       <p>쫓긴다. 몸을 갈아타며 도망친다. <b>보스를 빼앗아 그것이 된다.</b></p>
       <p>업그레이드는 없다. 빙의가 곧 레벨업이다.</p>
       <div class="keys">
-        <div class="key"><i>이동</i><span>화면을 누른 채로 끌어요. 손을 떼면 멈춰요</span></div>
+        <div class="key"><i>이동</i><span>화면을 누른 채로 끌어요. 손을 떼면 멈춰요. 컴퓨터는 WASD·방향키</span></div>
         <div class="key"><i>공격</i><span>자동. 몬스터마다 공격 모습이 달라요</span></div>
         <div class="key"><i>빙의</i><span>체력이 20% 아래면 아래 버튼이 켜져요</span></div>
         <div class="key"><i>보스</i><span>체력 10%에서 비틀거릴 때 게이지를 맞춰요</span></div>
@@ -195,9 +195,24 @@ stage.addEventListener("pointerdown",function(e){
   if(S.phase==="gauge"){ resolveGauge(); return; }
   if(S.phase==="card"){ closeCard(); return; }
   drag.on=true; drag.ox=e.clientX; drag.oy=e.clientY; drag.x=e.clientX; drag.y=e.clientY;
+  S.moved=true;
 });
 stage.addEventListener("pointermove",function(e){ if(drag.on){ drag.x=e.clientX; drag.y=e.clientY; } });
 function up(){ drag.on=false; }
+// 컴퓨터용: WASD / 방향키
+var KEYS={};
+window.addEventListener("keydown",function(e){
+  var k=e.key.toLowerCase(); KEYS[k]=true; if(S&&S.phase==="play") S.moved=true;
+  if(k===" "||k==="enter"){ if(S&&S.phase==="gauge") resolveGauge(); else if(S&&S.phase==="card") closeCard(); else if(S&&S.phase==="play") doAction(); }
+  if(k.indexOf("arrow")===0||k===" ") e.preventDefault();
+});
+window.addEventListener("keyup",function(e){ KEYS[e.key.toLowerCase()]=false; });
+function keyDir(){
+  var x=0,y=0;
+  if(KEYS["a"]||KEYS["arrowleft"]) x-=1; if(KEYS["d"]||KEYS["arrowright"]) x+=1;
+  if(KEYS["w"]||KEYS["arrowup"]) y-=1;   if(KEYS["s"]||KEYS["arrowdown"]) y+=1;
+  return {x:x,y:y};
+}
 stage.addEventListener("pointerup",up); stage.addEventListener("pointercancel",up);
 
 /* ── 월드 ───────────────────────────────────────────── */
@@ -353,8 +368,9 @@ function step(d,dtReal){
   S.t+=d; S.flash=Math.max(0,S.flash-d*2); S.hurt=Math.max(0,S.hurt-d);
 
   var t=tier(), spd=S.soul>0?235:t.spd;
-  if(drag.on&&!S.hop){
-    var dx=drag.x-drag.ox, dy=drag.y-drag.oy, len=Math.hypot(dx,dy);
+  var kd=keyDir(), useKeys=(kd.x||kd.y)&&!drag.on;
+  if((drag.on||useKeys)&&!S.hop){
+    var dx=useKeys?kd.x*70:drag.x-drag.ox, dy=useKeys?kd.y*70:drag.y-drag.oy, len=Math.hypot(dx,dy);
     if(len>6){
       var k=Math.min(1,len/70);
       S.x+=dx/len*spd*k*d; S.y+=dy/len*spd*k*d;
@@ -751,6 +767,19 @@ function draw(){
     g.textAlign="left";
   }
 
+  if(!S.moved&&S.phase==="play"){
+    // 처음 한 번: 이동 방법 안내
+    var hy=H*0.7, sw=Math.sin(S.t*3)*40;
+    g.fillStyle="rgba(10,12,18,.6)"; g.fillRect(0,hy-46,W,96);
+    g.strokeStyle="rgba(255,255,255,.35)"; g.lineWidth=2;
+    g.beginPath(); g.arc(W/2,hy+18,22,0,6.3); g.stroke();
+    g.fillStyle="rgba(127,216,255,.85)"; g.beginPath(); g.arc(W/2+sw*0.5,hy+18,10,0,6.3); g.fill();
+    g.font='18px "Do Hyeon","Gothic A1",sans-serif'; g.fillStyle="#f2f4f8"; g.textAlign="center";
+    g.fillText("화면을 누른 채로 끌면 움직여요",W/2,hy-18);
+    g.font='12px "Gothic A1",sans-serif'; g.fillStyle="#8f98a8";
+    g.fillText("컴퓨터는 WASD 또는 방향키",W/2,hy+56);
+    g.textAlign="left";
+  }
   if(drag.on&&S.phase==="play"){
     var jx=drag.x-drag.ox, jy=drag.y-drag.oy, jl=Math.hypot(jx,jy), jm=Math.min(1,46/(jl||1));
     g.strokeStyle="rgba(255,255,255,.2)"; g.lineWidth=2;
