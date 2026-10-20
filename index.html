@@ -155,13 +155,15 @@ var SFX={
   perfect:function(){ blip({type:"triangle",f0:520,f1:1560,d:.3,v:.2}); blip({type:"sine",f0:130,f1:90,d:.35,v:.18}); },
   groggy:function(){ blip({type:"sine",f0:90,f1:50,d:.5,v:.22}); noise(.3,.1,200); },
   shatter:function(){ noise(.35,.2,700); blip({type:"sine",f0:700,f1:120,d:.3,v:.12}); },
-  fail:function(){ blip({type:"sawtooth",f0:200,f1:80,d:.3,v:.14}); }
+  fail:function(){ blip({type:"sawtooth",f0:200,f1:80,d:.3,v:.14}); },
+  spit:function(){ blip({type:"sine",f0:620,f1:230,d:.09,v:.09}); },
+  splat:function(){ noise(.07,.08,1200); blip({type:"sine",f0:180,f1:90,d:.08,v:.08}); }
 };
 function buzz(ms){ try{ if(navigator.vibrate) navigator.vibrate(ms); }catch(e){} }
 
 /* ── 등급표 ─────────────────────────────────────────── */
 var TIER=[
- {n:"슬라임", c:"#5ec8ff", hp:60,  spd:118, dmg:8,  rng:58,  cd:.90, r:16, line:"작아서 잘 맞지 않는다",          sk:"끈끈이",       st:[2,1,2]},
+ {n:"슬라임", c:"#5ec8ff", hp:60,  spd:118, dmg:9,  rng:58,  cd:.75, r:16, line:"작아서 잘 맞지 않는다",          sk:"끈끈이",       st:[2,1,2]},
  {n:"고블린", c:"#5fd07a", hp:85,  spd:150, dmg:13, rng:72,  cd:.70, r:17, line:"창술에 능하다",                 sk:"삼단 찌르기", st:[3,2,3]},
  {n:"늑대",   c:"#c3cad6", hp:105, spd:190, dmg:17, rng:78,  cd:.58, r:18, line:"무리를 앞지른다",               sk:"질주",         st:[5,2,3]},
  {n:"오우거", c:"#c08550", hp:180, spd:128, dmg:34, rng:92,  cd:.92, r:24, line:"한 번 휘두르면 길이 열린다",    sk:"내려찍기",     st:[2,5,5]},
@@ -182,7 +184,7 @@ function mk(){
   return { phase:"play", t:0, slow:1, lv:0,
     hp:TIER[0].hp, hpMax:TIER[0].hp, x:0,y:0, face:1,
     soul:0, orbs:3, cd:0, hurt:0, flash:0,
-    foes:[], hits:[], bits:[], trail:[], boss:null, fx:[], puddles:[], hop:null,
+    foes:[], hits:[], bits:[], trail:[], boss:null, fx:[], puddles:[], hop:null, shots:[], squish:0,
     spawnT:0, bossT:14, wave:1, gauge:null, card:null, result:null, missed:0 };
 }
 function tier(){ return TIER[S.lv]; }
@@ -425,6 +427,21 @@ function step(d,dtReal){
   for(var h=S.hits.length-1;h>=0;h--){ S.hits[h].t-=dtReal; if(S.hits[h].t<=0) S.hits.splice(h,1); }
   for(var fi=S.fx.length-1;fi>=0;fi--){ S.fx[fi].t-=d; if(S.fx[fi].t<=0) S.fx.splice(fi,1); }
   for(var pu=S.puddles.length-1;pu>=0;pu--){ S.puddles[pu].t-=d; if(S.puddles[pu].t<=0) S.puddles.splice(pu,1); }
+  S.squish=Math.max(0,S.squish-d);
+  // 점액 덩어리
+  for(var si=S.shots.length-1;si>=0;si--){
+    var sh=S.shots[si]; sh.x+=sh.vx*d; sh.y+=sh.vy*d; sh.life-=d; sh.ph+=d*22;
+    if(Math.random()<d*35) S.bits.push({x:sh.x,y:sh.y,vx:0,vy:0,t:.16,c:"#5ec8ff",r:2.2});
+    var hitT=null, ts=targets();
+    for(var ti=0;ti<ts.length;ti++){ var tf=ts[ti]; if(Math.hypot(tf.x-sh.x,tf.y-sh.y)<tf.r+sh.r){ hitT=tf; break; } }
+    if(hitT||sh.life<=0){
+      if(hitT){ damage(hitT,sh.dmg); hitCircle(sh.x,sh.y,22,sh.dmg*0.3); SFX.splat(); stop=.025; }
+      burst(sh.x,sh.y,"#5ec8ff",8,140);
+      S.puddles.push({x:sh.x,y:sh.y,r:30,t:2.6});
+      S.fx.push({k:"splat",x:sh.x,y:sh.y,R:26,t:.2,d:.2});
+      S.shots.splice(si,1);
+    }
+  }
   for(var p=S.bits.length-1;p>=0;p--){
     var bt=S.bits[p]; bt.t-=d; bt.x+=bt.vx*d; bt.y+=bt.vy*d; bt.vx*=0.92; bt.vy*=0.92;
     if(bt.t<=0) S.bits.splice(p,1);
@@ -440,9 +457,9 @@ function step(d,dtReal){
 }
 
 /* ── 몬스터마다 다른 공격 ───────────────────────────── */
-// 슬라임 몸통박치기, 고블린 창 찌르기, 늑대 달려들어 물기, 오우거 내려찍기,
+// 슬라임 점액 뱉기, 고블린 창 찌르기, 늑대 달려들어 물기, 오우거 내려찍기,
 // 그리핀 날개바람, 와이번 짧은 불길, 드래곤 넓은 불길
-var ATK=["bounce","thrust","lunge","slam","gust","breath","breath"];
+var ATK=["spit","thrust","lunge","slam","gust","breath","breath"];
 function targets(){ var a=S.foes.slice(); if(S.boss) a.push(S.boss); return a; }
 function nearestAny(maxD){
   var bf=null,bd=maxD;
@@ -469,10 +486,15 @@ function hitCone(x,y,ang,R,half,dmg,kb){
   });
 }
 function attack(t){
-  var tg=nearestAny(t.rng*1.25); if(!tg) return false;
+  var k=ATK[S.lv];
+  var tg=nearestAny(k==="spit"?230:t.rng*1.25); if(!tg) return false;
   var dx=tg.x-S.x, dy=tg.y-S.y, dist=Math.hypot(dx,dy), ang=Math.atan2(dy,dx);
   if(Math.abs(dx)>1) S.face=dx>0?1:-1;
-  var k=ATK[S.lv];
+  if(k==="spit"){
+    var sp=430, mxp=S.x+Math.cos(ang)*t.r*0.9, myp=S.y+Math.sin(ang)*t.r*0.9;
+    S.shots.push({x:mxp,y:myp,vx:Math.cos(ang)*sp,vy:Math.sin(ang)*sp,r:7,dmg:t.dmg,life:.7,ph:0});
+    S.squish=.14; SFX.spit(); return true;
+  }
   if(k==="bounce"||k==="lunge"){
     var go=Math.max(0,Math.min(k==="lunge"?95:t.rng,dist-tg.r-t.r*0.5));
     S.hop={t:0,dur:k==="lunge"?.12:.22,fx:S.x,fy:S.y,
@@ -545,6 +567,10 @@ function drawFx(ox,oy){
         g.strokeStyle="rgba(255,255,255,"+(0.6*a)+")"; g.lineWidth=2;
         for(var s=1;s<=3;s++){ g.beginPath(); g.arc(0,0,R2*s/3.3,-h2*0.8,h2*0.8); g.stroke(); }
       }
+    } else if(f.k==="splat"){
+      var rs=f.R*(0.4+0.6*(1-a));
+      g.globalAlpha=a; g.strokeStyle="#7fd8ff"; g.lineWidth=3*a+1;
+      g.beginPath(); g.ellipse(x,y,rs,rs*0.6,0,0,6.3); g.stroke();
     } else if(f.k==="land"){
       var r3=f.R*(0.5+0.5*(1-a));
       g.globalAlpha=a; g.strokeStyle="#7fd8ff"; g.lineWidth=4*a+1;
@@ -722,6 +748,13 @@ function draw(){
     g.textAlign="left";
   }
 
+  for(var s2=0;s2<S.shots.length;s2++){
+    var shd=S.shots[s2], ssx=shd.x+ox, ssy=shd.y+oy, wob=1+Math.sin(shd.ph)*0.14;
+    g.fillStyle="#5ec8ff"; g.beginPath();
+    g.ellipse(ssx,ssy,shd.r*1.25*wob,shd.r/wob,Math.atan2(shd.vy,shd.vx),0,6.3); g.fill();
+    g.strokeStyle="#1f6fa3"; g.lineWidth=2; g.stroke();
+    g.fillStyle="rgba(255,255,255,.85)"; g.beginPath(); g.arc(ssx-2,ssy-2.5,2.2,0,6.3); g.fill();
+  }
   for(var p=0;p<S.bits.length;p++){
     var bit=S.bits[p];
     g.globalAlpha=Math.max(0,Math.min(1,bit.t*2.2));
@@ -741,7 +774,7 @@ function draw(){
     var glow=g.createRadialGradient(mx,my+me.r*0.8,2,mx,my+me.r*0.8,me.r*1.6);
     glow.addColorStop(0,"rgba(127,216,255,.55)"); glow.addColorStop(1,"rgba(127,216,255,0)");
     g.fillStyle=glow; g.beginPath(); g.ellipse(mx,my+me.r*0.8,me.r*1.6,me.r*0.62,0,0,6.3); g.fill();
-    creature(S.lv,mx,my,me.r,S.face,S.t*6,S.hurt>0,false);
+    creature(S.lv,mx,my,me.r*(1+S.squish*0.9),S.face,S.t*6,S.hurt>0,false);
     g.fillStyle="#7fd8ff"; g.beginPath();
     g.moveTo(mx,my-me.r*1.95); g.lineTo(mx-6,my-me.r*1.95-9); g.lineTo(mx+6,my-me.r*1.95-9); g.closePath(); g.fill();
     g.strokeStyle="rgba(255,255,255,.5)"; g.lineWidth=1.5;
