@@ -187,10 +187,10 @@ var TIER=[
  {n:"슬라임", c:"#5ec8ff", hp:60,  spd:118, dmg:8,  edmg:8,  rng:58,  cd:.5, r:16, line:"작아서 잘 맞지 않는다",          sk:"끈끈이",       st:[2,1,1]},
  {n:"고블린", c:"#5fd07a", hp:85,  spd:150, dmg:16, edmg:13, rng:72,  cd:.50, r:17, line:"창술에 능하다",                 sk:"삼단 찌르기", st:[3,2,2]},
  {n:"늑대",   c:"#c3cad6", hp:105, spd:190, dmg:28, edmg:17, rng:78,  cd:.50, r:18, line:"무리를 앞지른다",               sk:"질주",         st:[5,2,3]},
- {n:"오우거", c:"#c08550", hp:180, spd:128, dmg:70, edmg:34, rng:92,  cd:.82, r:24, line:"한 번 휘두르면 길이 열린다",    sk:"내려찍기",     st:[2,5,4]},
- {n:"그리핀", c:"#e8c45e", hp:150, spd:205, dmg:75, edmg:28, rng:102, cd:.58, r:22, line:"땅을 밟지 않고 덮친다",         sk:"급강하",       st:[5,3,4]},
- {n:"와이번", c:"#a56ad6", hp:170, spd:220, dmg:100,edmg:34, rng:116, cd:.52, r:24, line:"하늘에서는 아무도 닿지 못한다", sk:"화염 숨결",   st:[5,4,5]},
- {n:"드래곤", c:"#e8574a", hp:240, spd:200, dmg:130,edmg:52, rng:142, cd:.46, r:30, line:"쫓기던 것이 끝난다",            sk:"광역 화염",   st:[4,5,5]}
+ {n:"오우거", c:"#c08550", hp:180, spd:128, dmg:70, edmg:34, rng:130, cd:.82, r:24, line:"한 번 휘두르면 길이 열린다",    sk:"내려찍기",     st:[2,5,4]},
+ {n:"그리핀", c:"#e8c45e", hp:150, spd:205, dmg:75, edmg:28, rng:160, cd:.58, r:22, line:"땅을 밟지 않고 덮친다",         sk:"급강하",       st:[5,3,4]},
+ {n:"와이번", c:"#a56ad6", hp:170, spd:220, dmg:100,edmg:34, rng:200, cd:.52, r:24, line:"하늘에서는 아무도 닿지 못한다", sk:"화염 숨결",   st:[5,4,5]},
+ {n:"드래곤", c:"#e8574a", hp:240, spd:200, dmg:130,edmg:52, rng:250, cd:.46, r:30, line:"쫓기던 것이 끝난다",            sk:"광역 화염",   st:[4,5,5]}
 ];
 var GROGGY=[0,4.0,3.6,3.2,2.8,2.4,2.0];
 var GAUGE_W=[0,.20,.17,.14,.115,.09,.07];
@@ -200,7 +200,7 @@ var GAUGE_S=[0,.60,.70,.80,.95,1.10,1.30];
 var SKILLS=[
  [{n:"점액 폭탄",cd:4,k:"bomb",m:2.4,R:85},{n:"분열",cd:7,k:"nova",cnt:10,m:1}],
  [{n:"삼단 찌르기",cd:3,k:"triple",m:2.2},{n:"창 비",cd:4,k:"pierce",m:2.2,cnt:5,spread:.55}],
- [{n:"질주",cd:5,k:"dash",m:1.5,dist:230},{n:"물어뜯기",cd:3,k:"cone",m:2.4,R:80,h:.9,fx:"bite"},{n:"울부짖기",cd:8,k:"stun",R:190,dur:1.6}],
+ [{n:"질주",cd:5,k:"dash",m:1.5,dist:230},{n:"물어뜯기",cd:3,k:"cone",m:3,R:120,h:1,fx:"bite"},{n:"울부짖기",cd:8,k:"stun",R:190,dur:1.6}],
  [{n:"내려찍기",cd:4,k:"slam",m:2.2,R:150,kb:90},{n:"휘두르기",cd:3,k:"slam",m:1.2,R:115,kb:220},{n:"돌진",cd:6,k:"dash",m:1.8,dist:210}],
  [{n:"급강하",cd:4,k:"leap",m:2.2,R:110},{n:"날개바람",cd:3,k:"cone",m:1,R:190,h:1.1,kb:320,fx:"gust"},{n:"낚아채기",cd:5,k:"grab",m:5}],
  [{n:"비행",cd:9,k:"fly",dur:2.6},{n:"화염 숨결",cd:3,k:"cone",m:2,R:220,h:.5,fx:"breath"},{n:"꼬리치기",cd:3,k:"slam",m:1.5,R:110,kb:160},{n:"급습",cd:5,k:"dash",m:2,dist:240}],
@@ -469,7 +469,7 @@ function step(d,dtReal){
       }
     }
     e.touch-=d;
-    if(S.soul<=0 && !(S.fly>0) && L<e.r+tier().r && e.touch<=0){
+    if(S.soul<=0 && !(S.fly>0) && !(S.hop&&S.hop.lunge) && L<e.r+tier().r && e.touch<=0){
       e.touch=.7; S.hp-=e.dmg; S.hurt=.25; SFX.hurt(); shake(5); buzz(15);
       if(S.hp<=0){
         if(S.orbs<=0){ endGame(false); return; }
@@ -554,7 +554,7 @@ function hitCone(x,y,ang,R,half,dmg,kb){
 }
 function attack(t){
   var k=ATK[S.lv];
-  var tg=nearestAny(k==="spit"?300:(k==="spear"?340:t.rng*1.25)); if(!tg) return false;
+  var tg=nearestAny(k==="spit"?300:(k==="spear"?340:(k==="lunge"?230:t.rng*1.25))); if(!tg) return false;
   var dx=tg.x-S.x, dy=tg.y-S.y, dist=Math.hypot(dx,dy), ang=Math.atan2(dy,dx);
   if(Math.abs(dx)>1) S.face=dx>0?1:-1;
   if(k==="spit"){
@@ -566,10 +566,12 @@ function attack(t){
     S.shots.push({x:S.x,y:S.y,vx:Math.cos(ang)*640,vy:Math.sin(ang)*640,r:9,dmg:t.dmg,life:.55,ph:0,pierce:true,spear:true,hits:[]});
     SFX.spit(); return true;
   }
-  if(k==="bounce"||k==="lunge"){
-    var go=Math.max(0,Math.min(k==="lunge"?95:t.rng,dist-tg.r-t.r*0.5));
-    S.hop={t:0,dur:k==="lunge"?.12:.22,fx:S.x,fy:S.y,
-      tx:S.x+Math.cos(ang)*go,ty:S.y+Math.sin(ang)*go,dmg:t.dmg,ang:ang,lunge:k==="lunge"};
+  if(k==="lunge"){
+    // 늑대: 멀리서도 달려들어 물고, 근처 적에게 두 번 더 연달아 달려든다. 달려드는 동안은 안 맞는다
+    var go=Math.max(0,Math.min(230,dist-tg.r-t.r*0.4));
+    hitLine(S.x,S.y,ang,go,18,t.dmg*0.5);
+    S.hop={t:0,dur:.11,fx:S.x,fy:S.y,tx:S.x+Math.cos(ang)*go,ty:S.y+Math.sin(ang)*go,
+      dmg:t.dmg,ang:ang,lunge:true,chain:2,trail:true};
     return true;
   }
   if(k==="thrust"){
@@ -603,6 +605,17 @@ function updateHop(d){
     } else if(h.lunge&&!h.quiet){
       hitCone(S.x,S.y,h.ang,64,1.0,h.dmg);
       S.fx.push({k:"bite",x:S.x,y:S.y,a:h.ang,R:54,t:.22,d:.22}); SFX.hit(); stop=.04; shake(3);
+      if(h.chain>0){
+        var nx=nearestAny(190);
+        if(nx){
+          var a3=Math.atan2(nx.y-S.y,nx.x-S.x),
+              g3=Math.max(0,Math.min(190,Math.hypot(nx.x-S.x,nx.y-S.y)-nx.r-tier().r*0.4));
+          if(Math.abs(nx.x-S.x)>1) S.face=nx.x>S.x?1:-1;
+          S.hop={t:0,dur:.1,fx:S.x,fy:S.y,tx:S.x+Math.cos(a3)*g3,ty:S.y+Math.sin(a3)*g3,
+            dmg:h.dmg,ang:a3,lunge:true,chain:h.chain-1,trail:true};
+          return;
+        }
+      }
     }
     S.hop=null;
   }
@@ -1056,6 +1069,9 @@ function ui(){
 
 function start(){
   S=mk(); cam.x=0;cam.y=0;cam.sx=0;cam.sy=0; last=performance.now(); ac();
+  // 시험용: 주소 끝에 #lv3 을 붙이면 3등급(늑대)으로 시작
+  var lvm=/^#lv([1-7])$/.exec(location.hash||"");
+  if(lvm){ S.lv=parseInt(lvm[1],10)-1; S.hpMax=tier().hp; S.hp=S.hpMax; S.bossT=6; }
   // 시작하자마자 싸울 거리가 있게, 가까운 곳에 몇 마리를 미리 둔다
   for(var i=0;i<5;i++){
     spawnFoe(0); var f0=S.foes[S.foes.length-1], a0=i/5*Math.PI*2+Math.random()*0.5, r0=190+Math.random()*110;
