@@ -201,13 +201,13 @@ function up(){ drag.on=false; }
 stage.addEventListener("pointerup",up); stage.addEventListener("pointercancel",up);
 
 /* ── 월드 ───────────────────────────────────────────── */
-function spawnFoe(){
+function spawnFoe(forceLv){
   var lvMax=Math.min(TIER.length-1,S.lv+1), lvMin=Math.max(0,S.lv-2);
-  var l=lvMin+Math.floor(Math.random()*(lvMax-lvMin+1));
+  var l=(forceLv!==undefined)?forceLv:lvMin+Math.floor(Math.random()*(lvMax-lvMin+1));
   var a=Math.random()*Math.PI*2, d=Math.hypot(W,H)*0.5+30, t=TIER[l];
   S.foes.push({x:S.x+Math.cos(a)*d,y:S.y+Math.sin(a)*d,lv:l,
     hp:t.hp*0.55,hpMax:t.hp*0.55,r:t.r*0.78,spd:t.spd*0.72+S.wave*3,
-    dmg:t.dmg*0.55,touch:0,boss:false,hit:0,face:1,ph:Math.random()*6,kx:0,ky:0});
+    dmg:t.dmg*Math.min(0.6,0.32+S.wave*0.06),touch:0,boss:false,hit:0,face:1,ph:Math.random()*6,kx:0,ky:0});
 }
 function spawnBoss(){
   var l=Math.min(TIER.length-1,S.lv+1); if(l===S.lv) return;
@@ -397,7 +397,7 @@ function step(d,dtReal){
     }
     e.touch-=d;
     if(S.soul<=0 && L<e.r+tier().r && e.touch<=0){
-      e.touch=.55; S.hp-=e.dmg; S.hurt=.25; SFX.hurt(); shake(5); buzz(15);
+      e.touch=.7; S.hp-=e.dmg; S.hurt=.25; SFX.hurt(); shake(5); buzz(15);
       if(S.hp<=0){
         if(S.orbs<=0){ endGame(false); return; }
         S.hp=0; S.soul=5; S.flash=.4; SFX.shatter(); shake(12); buzz([30,30,30]);
@@ -571,22 +571,27 @@ function drawGround(ox,oy){
 var SPR_FILES=["sprites/0_slime.png","sprites/1_goblin.png","sprites/2_wolf.png","sprites/3_ogre.png",
                "sprites/4_griffin.png","sprites/5_wyvern.png","sprites/6_dragon.png"];
 var SPR=SPR_FILES.map(function(src){
-  var o={img:new Image(),white:null,ok:false};
+  var o={img:new Image(),white:null,dark:null,ok:false};
   o.img.onload=function(){
     o.ok=true;
     var c=document.createElement("canvas"); c.width=o.img.width; c.height=o.img.height;
     var x=c.getContext("2d"); x.drawImage(o.img,0,0);
     x.globalCompositeOperation="source-in"; x.fillStyle="#ffffff"; x.fillRect(0,0,c.width,c.height);
     o.white=c;
+    // 적용: 어둡고 붉은 기가 도는 판
+    var c2=document.createElement("canvas"); c2.width=o.img.width; c2.height=o.img.height;
+    var x2=c2.getContext("2d"); x2.drawImage(o.img,0,0);
+    x2.globalCompositeOperation="source-atop"; x2.fillStyle="rgba(40,0,10,.42)"; x2.fillRect(0,0,c2.width,c2.height);
+    o.dark=c2;
   };
   o.img.src=src; return o;
 });
-function sprite(lv,x,y,r,face,ph,hit){
+function sprite(lv,x,y,r,face,ph,hit,foe){
   var s=SPR[lv]; if(!s.ok) return false;
   var h=r*2.9, w=h*s.img.width/s.img.height;
   var bob=Math.sin(ph)*0.05;
   g.save(); g.translate(x,y+r*0.95); g.scale(face*(1+bob*0.5),1-bob);
-  g.drawImage(hit&&s.white?s.white:s.img,-w/2,-h,w,h);
+  g.drawImage(hit&&s.white?s.white:(foe&&s.dark?s.dark:s.img),-w/2,-h,w,h);
   g.restore(); return true;
 }
 
@@ -594,8 +599,8 @@ function sprite(lv,x,y,r,face,ph,hit){
 function body(x,y,r,col,dark,hit){
   g.fillStyle=hit?"#ffffff":col; g.strokeStyle=hit?"#ffffff":dark; g.lineWidth=Math.max(2,r*0.14);
 }
-function creature(lv,x,y,r,face,ph,hit){
-  if(sprite(lv,x,y,r,face,ph,hit)) return;
+function creature(lv,x,y,r,face,ph,hit,foe){
+  if(sprite(lv,x,y,r,face,ph,hit,foe)) return;
   var t=TIER[lv], col=t.c, dark=shade(col,-0.45);
   g.save(); g.translate(x,y); g.scale(face,1);
   body(0,0,r,col,dark,hit);
@@ -680,7 +685,7 @@ function draw(){
   for(var j=0;j<S.foes.length;j++){
     var f=S.foes[j];
     g.fillStyle="rgba(0,0,0,.35)"; g.beginPath(); g.ellipse(f.x+ox,f.y+oy+f.r*0.75,f.r*0.8,f.r*0.3,0,0,6.3); g.fill();
-    creature(f.lv,f.x+ox,f.y+oy,f.r,f.face,f.ph,f.hit>0);
+    creature(f.lv,f.x+ox,f.y+oy,f.r,f.face,f.ph,f.hit>0,true);
   }
 
   if(S.boss){
@@ -717,8 +722,12 @@ function draw(){
     g.font='bold 14px "Gothic A1",sans-serif'; g.fillStyle="#7fd8ff"; g.textAlign="center";
     g.fillText(S.soul.toFixed(1),mx,my-28); g.textAlign="left";
   } else {
-    g.fillStyle="rgba(0,0,0,.4)"; g.beginPath(); g.ellipse(mx,my+me.r*0.8,me.r*0.85,me.r*0.3,0,0,6.3); g.fill();
-    creature(S.lv,mx,my,me.r,S.face,S.t*6,S.hurt>0);
+    var glow=g.createRadialGradient(mx,my+me.r*0.8,2,mx,my+me.r*0.8,me.r*1.6);
+    glow.addColorStop(0,"rgba(127,216,255,.55)"); glow.addColorStop(1,"rgba(127,216,255,0)");
+    g.fillStyle=glow; g.beginPath(); g.ellipse(mx,my+me.r*0.8,me.r*1.6,me.r*0.62,0,0,6.3); g.fill();
+    creature(S.lv,mx,my,me.r,S.face,S.t*6,S.hurt>0,false);
+    g.fillStyle="#7fd8ff"; g.beginPath();
+    g.moveTo(mx,my-me.r*1.95); g.lineTo(mx-6,my-me.r*1.95-9); g.lineTo(mx+6,my-me.r*1.95-9); g.closePath(); g.fill();
     g.strokeStyle="rgba(255,255,255,.5)"; g.lineWidth=1.5;
     g.beginPath(); g.arc(mx,my,me.r*1.5,0,6.3); g.stroke();
   }
@@ -784,8 +793,8 @@ function ui(){
 function start(){
   S=mk(); cam.x=0;cam.y=0;cam.sx=0;cam.sy=0; last=performance.now(); ac();
   // 시작하자마자 싸울 거리가 있게, 가까운 곳에 몇 마리를 미리 둔다
-  for(var i=0;i<7;i++){
-    spawnFoe(); var f0=S.foes[S.foes.length-1], a0=i/7*Math.PI*2+Math.random()*0.5, r0=150+Math.random()*120;
+  for(var i=0;i<5;i++){
+    spawnFoe(0); var f0=S.foes[S.foes.length-1], a0=i/5*Math.PI*2+Math.random()*0.5, r0=190+Math.random()*110;
     f0.x=Math.cos(a0)*r0; f0.y=Math.sin(a0)*r0;
   }
   document.getElementById("startSheet").hidden=true;
