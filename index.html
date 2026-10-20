@@ -786,7 +786,7 @@ function start(){
   // 시작하자마자 싸울 거리가 있게, 가까운 곳에 몇 마리를 미리 둔다
   for(var i=0;i<7;i++){
     spawnFoe(); var f0=S.foes[S.foes.length-1], a0=i/7*Math.PI*2+Math.random()*0.5, r0=150+Math.random()*120;
-    f0.x=Math.cos(a0)*r0; f0.y=Math.sin(a0)*r0; f0.lv=0;
+    f0.x=Math.cos(a0)*r0; f0.y=Math.sin(a0)*r0;
   }
   document.getElementById("startSheet").hidden=true;
   document.getElementById("endSheet").hidden=true;
