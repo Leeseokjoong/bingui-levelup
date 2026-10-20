@@ -285,6 +285,16 @@ function damage(f,amt){
     else { burst(f.x,f.y,TIER[f.lv].c,7,160); var i=S.foes.indexOf(f); if(i>=0) S.foes.splice(i,1); }
   } else if(f.boss&&f.hp<=f.hpMax*0.10&&f.groggy<=0){ f.groggy=GROGGY[f.lv]; SFX.groggy(); buzz(40); }
 }
+// 빙의할 수 있는 잡몹: 나와 같거나 낮은 등급만 (승급은 보스로만)
+function nearestPossessable(maxD){
+  var bf=null,bd=maxD*maxD;
+  for(var i=0;i<S.foes.length;i++){
+    var f=S.foes[i]; if(f.lv>S.lv) continue;
+    var dx=f.x-S.x,dy=f.y-S.y,d=dx*dx+dy*dy;
+    if(d<bd){bd=d;bf=f;}
+  }
+  return bf;
+}
 function nearestFoe(maxD){
   var bf=null,bd=maxD*maxD;
   for(var i=0;i<S.foes.length;i++){
@@ -301,14 +311,14 @@ function actionState(){
     if(Math.hypot(b.x-S.x,b.y-S.y)<b.r+95) return {kind:"boss",label:"보스 빙의",enabled:true};
     return {kind:"boss",label:"보스에게 가기",enabled:false};
   }
-  var near=nearestFoe(135);
+  var near=nearestPossessable(135);
   if(S.soul>0) return {kind:"jump",label:"몸 빼앗기",enabled:!!near&&S.orbs>0};
   if(S.hp<=S.hpMax*0.20) return {kind:"jump",label:"빙의 탈출",enabled:!!near&&S.orbs>0};
   return {kind:"none",label:"빙의",enabled:false};
 }
 function doAction(){
   var a=actionState(); if(!a.enabled) return;
-  if(a.kind==="boss") openGauge(); else jumpTo(nearestFoe(135));
+  if(a.kind==="boss") openGauge(); else jumpTo(nearestPossessable(135));
 }
 function soulStreak(fx,fy,tx,ty,col){
   for(var i=0;i<14;i++){
@@ -322,7 +332,7 @@ function jumpTo(f){
   S.orbs-=cost;
   soulStreak(S.x,S.y,f.x,f.y,"#7fd8ff");
   burst(S.x,S.y,"#7fd8ff",10,180);
-  S.lv=(f.lv>=S.lv)?S.lv:f.lv;
+  S.lv=Math.min(S.lv,f.lv);
   S.hpMax=tier().hp; S.hp=S.hpMax;
   S.x=f.x; S.y=f.y; S.soul=0; S.flash=.35; S.skcd=[0,0,0,0]; renderSkills();
   var i=S.foes.indexOf(f); if(i>=0) S.foes.splice(i,1);
@@ -974,7 +984,7 @@ function draw(){
 
   var a2=actionState();
   if(a2.enabled&&a2.kind==="jump"){
-    var n=nearestFoe(135);
+    var n=nearestPossessable(135);
     if(n){ g.strokeStyle="#7fd8ff"; g.lineWidth=2.5;
       g.beginPath(); g.arc(n.x+ox,n.y+oy,n.r+10+Math.sin(S.t*10)*2,0,6.3); g.stroke(); }
   }
